@@ -1,3 +1,14 @@
+#include <Trill.h>
+
+Trill trillSensor;
+const boolean verbose = true;
+
+int xPos = 0;
+int yPos = 0;
+
+int lastXPos = 0;
+int lastYPos = 0;
+
 int modePin = 34;
 int bypassPin = 33;
 int led = 36;
@@ -17,21 +28,51 @@ void setup() {
   pinMode(bypassPin, INPUT);
   pinMode(led, OUTPUT);
   Serial.begin(9600);
+  int ret = trillSensor.setup(Trill::TRILL_SQUARE);
+  if(ret != 0) {
+    Serial.println("failed to initialise trillSensor");
+    Serial.print("Error code: ");
+    Serial.println(ret);
+  } else {
+    if(verbose) {
+      Serial.println("Success initialising trillSensor");
+    }
+  }
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
-  if(digitalRead(modePin) == HIGH){
-    fxSeq();
-  } else {
-    checkNote_KEY_MODE();
-  }
-  
+  delay(50);
+  trillSensor.read();
+  // if(digitalRead(modePin) == HIGH){
+  //   fxSeq();
+  // } else {
+  //   checkNote_KEY_MODE();
+  // }
+  checkSquare_FX_MODE();
 }
 
 void fxSeq() {
   checkPot_FX_MODE(0);
   checkPot_FX_MODE(1);
+}
+
+void checkSquare_FX_MODE() {
+  xPos = map(trillSensor.touchHorizontalLocation(0), 0, 1792, 0, 127);
+  yPos = map(trillSensor.touchLocation(0), 0, 1792, 0, 127);
+  if(xPos != lastXPos) {
+    usbMIDI.sendControlChange(0, xPos, 0);
+    Serial.print("X: ");
+    Serial.println(+ xPos);
+  }
+  if(yPos != lastYPos) {
+    usbMIDI.sendControlChange(1, yPos, 0);
+    Serial.print("Y: ");
+    Serial.println(+ yPos);
+  }
+  lastXPos = xPos;
+  lastYPos = yPos;
+  delay(5);
 }
 
 void checkPot_FX_MODE(int index) {
