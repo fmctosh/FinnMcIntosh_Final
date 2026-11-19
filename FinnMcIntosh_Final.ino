@@ -45,6 +45,7 @@ void setup() {
       Serial.println("Success initialising trillSensor");
     }
   }
+  trillSensor.setNoiseThreshold(50);
 }
 
 void loop() {
@@ -57,11 +58,11 @@ void loop() {
 }
 
 void sequence() {
+  checkBypass();
+  checkScale();
   if(!digitalRead(modePin)){
-    checkBypass();
     squareSeq_FX_MODE();
   } else{
-    checkScale();
     posUpdate_KEYBOARD();
   }
 }
@@ -135,10 +136,10 @@ void posUpdate_BYPASS() {
 
 void checkBypass() {
   bypassState = digitalRead(bypassPin);
-  if (bypassState != lastBypassState) {
+  if (bypassState && !lastBypassState) {
     bypass = !bypass;
     if(bypass) {
-      analogWrite(bypassLed, 50);
+      analogWrite(bypassLed, 25);
     } else {
       analogWrite(bypassLed, 0);
     }
@@ -150,9 +151,9 @@ void checkBypass() {
 void checkTouch() {
   isTouched = trillSensor.getNumTouches() > 0 || trillSensor.getNumHorizontalTouches() > 0;
   if (isTouched && !lastIsTouched) {
-    digitalWrite(touchLed, 25);
+    analogWrite(touchLed, 25);
   } else if (!isTouched && !lastIsTouched) {
-    digitalWrite(touchLed, 0);
+    analogWrite(touchLed, 0);
   }
   delay(5);
 }
