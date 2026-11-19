@@ -9,27 +9,31 @@ int yPos = 0;
 int lastXPos = 0;
 int lastYPos = 0;
 
+int scalePin = 28;
 int modePin = 34;
 int bypassPin = 33;
-int led = 31;
-int axesPins[2] = { 39, 38 };
-String axesNames[2] = { "X", "Y" };
+int touchLed = 8;
+int bypassLed = 10;
 
 bool bypassState = LOW;
 bool lastBypassState = LOW;
 bool bypass = LOW;
 bool isTouched = false;
 bool lastIsTouched = false;
-int lastAxesVals[2] = { 0, 0 };
-int axesVals[2] = { 0, 0 };
 int note = 0;
 int lastNote = 0;
+int scales[2][7] = {
+    {0, 2, 4, 5, 7, 9, 11},
+    {0, 2, 3, 5, 7, 8, 10}
+  };
 
 void setup() {
   // put your setup code here, to run once:
   pinMode(modePin, INPUT);
   pinMode(bypassPin, INPUT);
-  pinMode(led, OUTPUT);
+  pinMode(bypassLed, OUTPUT);
+  pinMode(touchLed, OUTPUT);
+  pinMode(scalePin, INPUT);
   Serial.begin(9600);
   int ret = trillSensor.setup(Trill::TRILL_SQUARE);
   if (ret != 0) {
@@ -47,19 +51,19 @@ void loop() {
   // put your main code here, to run repeatedly:
   delay(50);
   trillSensor.read();
-  // if(digitalRead(modePin) == HIGH){
-  //   fxSeq();
-  // } else {
-  //   checkNote_KEY_MODE();
-  // }
   checkTouch();
-  checkBypass();
-  squareSeq_FX_MODE();
+  
+  sequence();
 }
 
-void fxSeq() {
-  checkPot_FX_MODE(0);
-  checkPot_FX_MODE(1);
+void sequence() {
+  if(!digitalRead(modePin)){
+    checkBypass();
+    squareSeq_FX_MODE();
+  } else{
+    checkScale();
+    posUpdate_KEYBOARD();
+  }
 }
 
 void squareSeq_FX_MODE() {
@@ -90,6 +94,27 @@ void posUpdate_DEFAULT(){
   delay(5);
 }
 
+void posUpdate_KEYBOARD(){
+  isTouched = trillSensor.getNumTouches() > 0 || trillSensor.getNumHorizontalTouches() > 0;
+  xPos = map(trillSensor.touchHorizontalLocation(0), 0, 1792, 0, 6);
+  yPos = (map(trillSensor.touchLocation(0), 0, 1792, 0, 3) * 10) + 50 + map(analogRead(A13), 0, 1023, 0, 12);
+  note = scales[checkScale()][xPos] + yPos;
+  if ((isTouched && !lastIsTouched)) {
+    usbMIDI.sendNoteOn(note, 127, 1);
+    lastNote = note;
+    Serial.println("TOUCHING");
+  } else if (!isTouched && lastIsTouched) {
+    usbMIDI.sendNoteOff(lastNote, 0, 1);
+    Serial.println("NOT TOUCHING");
+  } else if (isTouched && (note != lastNote)){
+    usbMIDI.sendNoteOff(lastNote, 0, 1);
+    usbMIDI.sendNoteOn(note, 127, 1);
+    lastNote = note;
+  }
+  lastIsTouched = isTouched;
+  delay(5);
+}
+
 void posUpdate_BYPASS() {
   xPos = map(analogRead(39), 0, 1023, 0, 127);
   yPos = map(analogRead(38), 0, 1023, 0, 127);
@@ -108,47 +133,34 @@ void posUpdate_BYPASS() {
   delay(5);
 }
 
-void checkPot_FX_MODE(int index) {
-  axesVals[index] = map(analogRead(axesPins[index]), 0, 1023, 0, 127);
-  if (axesVals[index] != lastAxesVals[index]) {
-    usbMIDI.sendControlChange(index, axesVals[index], 0);
-    Serial.println(axesNames[index] + ": " + axesVals[index]);
-  } else {
-    digitalWrite(led, 0);
-  }
-  lastAxesVals[index] = axesVals[index];
-  delay(5);
-}
-
-void checkNote_KEY_MODE() {
-
-  bypassState = digitalRead(bypassPin);
-  if (bypassState && !lastBypassState) {
-    note = map(analogRead(axesPins[0]), 0, 1023, 0, 10) * 12 + map(analogRead(axesPins[1]), 0, 1023, 0, 11);
-    usbMIDI.sendNoteOn(note, 127, 1);
-    lastNote = note;
-  } else if (bypassState == LOW && lastBypassState == HIGH) {
-    usbMIDI.sendNoteOff(lastNote, 0, 1);
-  }
-  lastBypassState = bypassState;
-  delay(5);
-}
-
 void checkBypass() {
   bypassState = digitalRead(bypassPin);
   if (bypassState != lastBypassState) {
     bypass = !bypass;
+    if(bypass) {
+      analogWrite(bypassLed, 50);
+    } else {
+      analogWrite(bypassLed, 0);
+    }
   }
+  lastBypassState = bypassState;
   delay(5);
 }
 
 void checkTouch() {
   isTouched = trillSensor.getNumTouches() > 0 || trillSensor.getNumHorizontalTouches() > 0;
   if (isTouched && !lastIsTouched) {
-    digitalWrite(led, 25);
+    digitalWrite(touchLed, 25);
   } else if (!isTouched && !lastIsTouched) {
-    digitalWrite(led, 0);
+    digitalWrite(touchLed, 0);
   }
-  lastIsTouched = isTouched;
   delay(5);
+}
+
+int checkScale() {
+  if (digitalRead(scalePin)) {
+    return 0;
+  } else {
+    return 1;
+  }
 }
