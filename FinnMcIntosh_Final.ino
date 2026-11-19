@@ -98,7 +98,7 @@ void posUpdate_DEFAULT(){
 void posUpdate_KEYBOARD(){
   isTouched = trillSensor.getNumTouches() > 0 || trillSensor.getNumHorizontalTouches() > 0;
   xPos = map(trillSensor.touchHorizontalLocation(0), 0, 1792, 0, 6);
-  yPos = (map(trillSensor.touchLocation(0), 0, 1792, 0, 3) * 10) + 50 + map(analogRead(A13), 0, 1023, 0, 12);
+  yPos = (map(trillSensor.touchLocation(0), 0, 1792, 0, 3) * 12) + 48 + map(analogRead(A13), 0, 1023, 0, 12);
   note = scales[checkScale()][xPos] + yPos;
   if ((isTouched && !lastIsTouched)) {
     usbMIDI.sendNoteOn(note, 127, 1);
